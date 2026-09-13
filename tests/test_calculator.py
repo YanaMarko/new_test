@@ -4,7 +4,6 @@ from playwright.sync_api import sync_playwright, expect
 import openpyxl
 
 BASE_URL = os.getenv("BASE_URL", "https://pryaniki.com")
-CALC_URL = f"{BASE_URL.rstrip('/')}/" # Скорректируйте путь, если калькулятор на подстранице
 
 @pytest.fixture(scope="function")
 def page():
@@ -12,118 +11,135 @@ def page():
         browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
-        page.goto(CALC_URL)
+        page.goto(BASE_URL)
         yield page
         browser.close()
 
-# --- БЛОК 1: UI И СТРУКТУРА (Шаблоны ИИ) ---
+# --- БЛОК 1: UI И СТРУКТУРА (Спроектировано ИИ) ---
 
 def test_01_ui_elements_visibility(page):
     """Кейс 1: Проверка видимости основных элементов управления калькулятора."""
-    expect(page.locator("text=Мета-КП")).to_be_visible()
-    expect(page.locator("select[name='tariff']")).to_be_visible()
-    expect(page.locator("input[name='users_count']")).to_be_visible()
-    expect(page.locator("input[name='license_term']")).to_be_visible()
+    # Проверяем вкладки переключения блоков под калькулятором
+    expect(page.locator("button:has-text('Модули')")).to_be_visible()
+    expect(page.locator("button:has-text('Внедрение')")).to_be_visible()
+    expect(page.locator("button:has-text('T&M')")).to_be_visible()
+    # Проверяем кнопку выгрузки сметы
+    expect(page.locator("button:has-text('Выгрузить смету в Excel')")).to_be_visible()
 
 def test_02_tariff_selection(page):
     """Кейс 2: Проверка переключения тарифов (Облако / Коробка)."""
-    select = page.locator("select[name='tariff']")
+    # Ищем кнопки переключения тарифа по тексту, как на скриншоте
+    btn_cloud = page.locator("button:has-text('TestQuest Облако')")
+    btn_box = page.locator("button:has-text('TestQuest Коробка')")
     
-    select.select_option("cloud")
-    expect(page.locator(".tariff-type-label")).to_contain_text("Облако")
+    btn_box.click()
+    # При переключении в синем блоке сметы должен поменяться заголовок или текст тарифа
+    expect(page.locator(".selected-modules-box")).to_contain_text("TESTQUEST КОРОБКА")
     
-    select.select_option("box")
-    expect(page.locator(".tariff-type-label")).to_contain_text("Коробка")
+    btn_cloud.click()
+    expect(page.locator(".selected-modules-box")).to_contain_text("TESTQUEST ОБЛАКО")
 
-# --- БЛОК 2: ВАЛИДАЦИЯ ВВОДА (Шаблоны ИИ) ---
+# --- БЛОК 2: ВАЛИДАЦИЯ ВВОДА (Спроектировано ИИ) ---
 
 def test_03_validation_negative_users(page):
     """Кейс 3: Валидация — ввод отрицательного количества пользователей."""
-    input_users = page.locator("input[name='users_count']")
+    # На скриншоте есть подпись "Число лицензий"
+    input_users = page.locator("label:has-text('Число лицензий') + input, input[placeholder='100']")
     input_users.fill("-5")
-    page.keyboard.press("Enter")
+    input_users.press("Enter")
     
-    # Предполагается наличие сообщения об ошибке или сброс в мин. значение
-    expect(page.locator(".error-message")).to_be_visible()
+    # Ищем появление сообщения об ошибке или сброс к минимальному значению 1
+    assert input_users.input_value() != "-5"
 
 def test_04_validation_max_license_term(page):
     """Кейс 4: Валидация — ограничение максимального срока лицензии."""
-    input_term = page.locator("input[name='license_term']")
-    input_term.fill("999") 
-    page.keyboard.press("Enter")
+    # На скриншоте поле "Срок, мес." находится рядом с числом лицензий
+    input_term = page.locator("label:has-text('Срок, мес.') + input")
+    input_term.fill("999")
+    input_term.press("Enter")
     
-    # Проверяем, что значение скорректировалось или появилась ошибка
-    expect(page.locator(".error-message")).to_be_visible()
+    # Система должна либо скорректировать значение, либо вывести ошибку валидации
+    expect(page.locator("body")).to_contain_text("Неверное значение")
 
-# --- БЛОК 3: ЛОГИКА И МОДУЛИ (Шаблоны ИИ) ---
+# --- БЛОК 3: ЛОГИКА И МОДУЛИ (Спроектировано ИИ) ---
 
 def test_05_modules_activation_recalc(page):
     """Кейс 5: Активация дополнительных модулей влияет на блок ИТОГО."""
-    initial_total = page.locator("#total_price").text_content()
+    # На скриншоте в ключевых модулях есть "Конструктор процессов"
+    checkbox_process = page.locator("label:has-text('Конструктор процессов') input[type='checkbox']")
     
-    # Включаем чекбокс модуля (селектор примерный)
-    page.locator("input[type='checkbox'][value='vnedrenie']").check()
+    # Запоминаем начальную сумму из синего блока (на скрине там 200 429 ₽)
+    initial_total = page.locator("text=Всего").locator("xpath=..").text_content()
     
-    new_total = page.locator("#total_price").text_content()
+    checkbox_process.check()
+    
+    # Проверяем, что сумма изменилась после выбора модуля
+    new_total = page.locator("text=Всего").locator("xpath=..").text_content()
     assert initial_total != new_total
 
 def test_06_tm_hours_calculation(page):
     """Кейс 6: Расчет стоимости работ по модели T&M (Time and Materials)."""
-    page.locator("input[name='tm_hours']").fill("10")
-    page.keyboard.press("Enter")
+    # Переходим на вкладку T&M
+    page.locator("button:has-text('T&M')").click()
     
-    # Проверяем, что блок стоимости T&M обновился
-    expect(page.locator("#tm_total_price")).not_to_contain_text("0")
+    # Находим инпут для ввода часов T&M
+    input_hours = page.locator("input[name*='hours'], input[type='number']").last
+    input_hours.fill("100")
+    input_hours.press("Enter")
+    
+    # На скриншоте фиолетовый блок отображает "TIME&MATERIAL Всего 585 000 ₽"
+    expect(page.locator("text=TIME&MATERIAL")).to_be_visible()
+    expect(page.locator("text=585 000")).to_be_visible()
 
 def test_07_meta_kp_toggle(page):
-    """Кейс 7: Включение опции 'Мета-КП' меняет структуру отображения сметы."""
-    toggle = page.locator("input[name='meta_kp']")
-    toggle.check()
-    expect(page.locator("#meta_kp_section")).to_be_visible()
+    """Кейс 7: Ввод названия компании и проверка заполнения мета-данных КП."""
+    input_company = page.locator("label:has-text('Название компании') + input, input[placeholder='Название компании']")
+    input_company.fill("ООО Ромашка")
+    
+    # Проверяем, что введенный текст отображается в поле
+    expect(input_company).to_have_value("ООО Ромашка")
 
 # --- БЛОК 4: СКВОЗНЫЕ СЦЕНАРИИ И ВЫГРУЗКА EXCEL ---
 
 def test_08_full_cycle_calculation(page):
-    """Кейс 8: Сквозной расчет: Облако + 50 пользователей + 12 месяцев + Внедрение."""
-    page.locator("select[name='tariff']").select_option("cloud")
-    page.locator("input[name='users_count']").fill("50")
-    page.locator("input[name='license_term']").fill("12")
-    page.locator("input[type='checkbox'][value='vnedrenie']").check()
+    """Кейс 8: Сквозной расчет: Облако + 100 пользователей + 12 месяцев."""
+    page.locator("button:has-text('TestQuest Облако')").click()
     
-    expect(page.locator("#total_price")).not_to_contain_text("0")
-    expect(page.locator("#total_price")).not_to_contain_text("Ошибка")
+    input_users = page.locator("label:has-text('Число лицензий') + input")
+    input_users.fill("100")
+    
+    input_term = page.locator("label:has-text('Срок, мес.') + input")
+    input_term.fill("12")
+    input_term.press("Enter")
+    
+    # Итоговый блок сметы должен успешно пересчитаться и показать сумму
+    expect(page.locator("text=200 429")).to_be_visible()
 
 def test_09_excel_export_download(page):
-    """Кейс 9: Проверка успешного скачивания файла Excel при клике на 'Выгрузить'."""
-    page.locator("select[name='tariff']").select_option("cloud")
-    page.locator("input[name='users_count']").fill("10")
-    
-    # Ожидаем событие скачивания файла
+    """Кейс 9: Проверка успешного скачивания файла Excel при клике на 'Выгрузить смету в Excel'."""
+    # Перехватываем событие скачивания файла при клике на синюю кнопку
     with page.expect_download() as download_info:
-        page.locator("button#download_excel").click()
+        page.locator("button:has-text('Выгрузить смету в Excel')").click()
     
     download = download_info.value
     path = download.path()
     
+    # Проверяем физическое существование файла на диске песочницы
     assert os.path.exists(path)
     assert download.suggested_filename.endswith(".xlsx")
 
 def test_10_excel_content_validation(page):
-    """Кейс 10: Валидация структуры скачанного Excel (проверка формул/данных)."""
-    page.locator("select[name='tariff']").select_option("box")
-    page.locator("input[name='users_count']").fill("25")
-    
+    """Кейс 10: Валидация структуры скачанного Excel (проверка наличия данных через openpyxl)."""
     with page.expect_download() as download_info:
-        page.locator("button#download_excel").click()
+        page.locator("button:has-text('Выгрузить смету в Excel')").click()
         
     download = download_info.value
     path = download.path()
     
-    # Читаем Excel файл парсером openpyxl
+    # Открываем скачанную смету библиотекой openpyxl
     wb = openpyxl.load_workbook(path)
     sheet = wb.active
     
-    # Проверяем, что в файле есть данные (например, заголовок или ячейка с тарифом)
-    cell_value = sheet["A1"].value
-    assert cell_value is not None
-    assert len(sheet.title) > 0
+    # Проверяем, что файл не пустой и содержит данные (например, название тарифа или заголовки)
+    assert sheet.max_row > 1
+    wb.close()
