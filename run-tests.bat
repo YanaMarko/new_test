@@ -1,4 +1,6 @@
 @echo off
+chcp 65001 > nul
+
 echo === Шаг 1: Создание виртуального окружения ===
 python -m venv venv
 call venv\Scripts\activate
@@ -13,5 +15,14 @@ playwright install chromium
 echo === Шаг 4: Запуск тестов ===
 pytest tests/ -v
 
-echo === ИТОГ: PASSED ===
-pause
+rem Сохраняем код выхода pytest
+set TEST_EXIT_CODE=%ERRORLEVEL%
+
+if %TEST_EXIT_CODE% equ 0 (
+    echo === ИТОГ: PASSED ===
+    exit /b 0
+) else (
+    echo === ИТОГ: FAILED ===
+    exit /b %TEST_EXIT_CODE%
+)
+
