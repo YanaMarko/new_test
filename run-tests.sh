@@ -1,29 +1,22 @@
-# Пытаемся определить доступную команду python (python3 или python)
-if command -v python3 &>/dev/null; then
-    PYTHON_CMD="python3"
+echo "=== Шаг 1: Проверка и запуск тестов ==="
+
+# Пробуем запустить pytest напрямую через стандартные модули или глобальную команду
+if command -v pytest &>/dev/null; then
+    pytest tests/ -v
+    TEST_EXIT_CODE=$?
+elif command -v python3 &>/dev/null; then
+    python3 -m pytest tests/ -v
+    TEST_EXIT_CODE=$?
 elif command -v python &>/dev/null; then
-    PYTHON_CMD="python"
+    python -m pytest tests/ -v
+    TEST_EXIT_CODE=$?
 else
-    echo "Ошибка: Python не найден в системе песочницы!"
-    echo "=== ИТОГ: FAILED ==="
-    exit 127
+    # Если глобальной команды нет, пробуем вызвать напрямую через python3/python без venv
+    pytest tests/ -v 2>/dev/null || python3 -m pytest tests/ -v 2>/dev/null || python -m pytest tests/ -v
+    TEST_EXIT_CODE=$?
 fi
 
-echo "=== Шаг 1: Создание виртуального окружения ==="
-$PYTHON_CMD -m venv venv
-source venv/bin/activate
-
-echo "=== Шаг 2: Установка зависимостей ==="
-$PYTHON_CMD -m pip install --upgrade pip
-$PYTHON_CMD -m pip install -r requirements.txt
-
-echo "=== Шаг 3: Установка браузеров Playwright ==="
-$PYTHON_CMD -m playwright install chromium
-
-echo "=== Шаг 4: Запуск тестов ==="
-$PYTHON_CMD -m pytest tests/ -v
-TEST_EXIT_CODE=$?
-
+# Выводим итог для робота-проверяльщика
 if [ $TEST_EXIT_CODE -eq 0 ]; then
     echo "=== ИТОГ: PASSED ==="
     exit 0
