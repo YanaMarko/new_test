@@ -1,6 +1,4 @@
 #!/bin/bash
-# Завершать скрипт при любой ошибке
-set -e
 
 echo "=== Шаг 1: Создание виртуального окружения ==="
 python3 -m venv venv
@@ -14,7 +12,16 @@ echo "=== Шаг 3: Установка браузеров Playwright ==="
 playwright install chromium
 
 echo "=== Шаг 4: Запуск тестов ==="
-# BASE_URL прокидывается из окружения песочницы
+# Выполняем тесты и сохраняем код ответа pytest в переменную
 pytest tests/ -v
+TEST_EXIT_CODE=$?
 
-echo "=== ИТОГ: PASSED ==="
+# Проверяем, как завершился pytest
+if [ $TEST_EXIT_CODE -eq 0 ]; then
+    echo "=== ИТОГ: PASSED ==="
+    exit 0
+else
+    echo "=== ИТОГ: FAILED ==="
+    exit $TEST_EXIT_CODE
+fi
+
